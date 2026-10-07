@@ -169,7 +169,64 @@ jobs:
               dart run flutter_launcher_icons || echo "::warning::flutter_launcher_icons gagal, lanjut pakai icon default."
             fi
 
-            printf 'import '''package:flutter/material.dart''';\nimport '''package:webview_flutter/webview_flutter.dart''';\n\nvoid main() => runApp(const WebApp());\n\nclass WebApp extends StatelessWidget {\n  const WebApp({super.key});\n  @override\n  Widget build(BuildContext context) {\n    return MaterialApp(\n      title: '''%s''',\n      debugShowCheckedModeBanner: false,\n      theme: ThemeData(useMaterial3: true),\n      home: const WebViewPage(),\n    );\n  }\n}\n\nclass WebViewPage extends StatefulWidget {\n  const WebViewPage({super.key});\n  @override\n  State<WebViewPage> createState() => _WebViewPageState();\n}\n\nclass _WebViewPageState extends State<WebViewPage> {\n  late final WebViewController controller;\n\n  @override\n  void initState() {\n    super.initState();\n    controller = WebViewController()\n      ..setJavaScriptMode(JavaScriptMode.unrestricted)\n      ..loadRequest(Uri.parse('''%s'''));\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    return Scaffold(\n      body: SafeArea(child: WebViewWidget(controller: controller)),\n    );\n  }\n}\n' "$DART_APP_NAME" "$WEB_URL_SAFE" > lib/main.dart
+            # ==== TULIS lib/main.dart PAKAI HEREDOC (FIX!) ====
+            cat > lib/main.dart << 'DART_EOF'
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+void main() => runApp(const WebApp());
+
+class WebApp extends StatelessWidget {
+  const WebApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '__APP_NAME__',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(useMaterial3: true),
+      home: const WebViewPage(),
+    );
+  }
+}
+
+class WebViewPage extends StatefulWidget {
+  const WebViewPage({super.key});
+  @override
+  State<WebViewPage> createState() => _WebViewPageState();
+}
+
+class _WebViewPageState extends State<WebViewPage> {
+  late final WebViewController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadRequest(Uri.parse('__WEB_URL__'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(child: WebViewWidget(controller: controller)),
+    );
+  }
+}
+DART_EOF
+
+            # Replace placeholder pakai sed (pake | biar aman dari / dan &)
+            python3 -c "
+import os
+app_name = os.environ.get('APP_NAME', 'WebApp')
+web_url = os.environ.get('WEB_URL', '')
+with open('lib/main.dart', 'r') as f:
+    content = f.read()
+content = content.replace('__APP_NAME__', app_name.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39)))
+content = content.replace('__WEB_URL__', web_url.replace(chr(39), '%27'))
+with open('lib/main.dart', 'w') as f:
+    f.write(content)
+"
 
             sed -i "s/android:label=\"[^\"]*\"/android:label=\"${XML_APP_NAME}\"/" android/app/src/main/AndroidManifest.xml
 
